@@ -1,3 +1,17 @@
 name: DCPUCraft
 main: net.ian.dcpu.DCPUCraft
 version: 1.0.0
+
+commands:
+    dcpurun:
+        description: run the program
+        usage: "Usage : /<command>"
+        
+    dcpustop:
+        description: stop the program
+        usage: "Usage : /<command>"
+
+    dcpuload:
+        description: load the program
+        usage: "Usage : /<command>"
+        

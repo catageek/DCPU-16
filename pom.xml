@@ -40,7 +40,7 @@
 	</distributionManagement>
 
 	<build>
-		<sourceDirectory>net/ian/dcpu</sourceDirectory>
+		<sourceDirectory>src</sourceDirectory>
 		<plugins>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
@@ -77,8 +77,8 @@
 						<configuration>
 							<resources>
 								<resource>
-									<directory>src/com/github/catageek/DCPU-16/plugins/resources</directory>
-									<targetPath>com/github/catageek/DCPU-16/plugins/resources</targetPath>
+									<directory>res</directory>
+									<targetPath>net/ian/DCPU-16/resources</targetPath>
 								</resource>
 							</resources>
 						</configuration>

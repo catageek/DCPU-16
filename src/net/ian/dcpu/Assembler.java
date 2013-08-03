@@ -1,5 +1,6 @@
 package net.ian.dcpu;
 
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -7,6 +8,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
+
+import net.ian.dcpu.DCPU.Register;
+
 
 public class Assembler {
 	// Blanks correspond to unspecified operations.

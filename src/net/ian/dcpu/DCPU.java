@@ -7,6 +7,7 @@ import java.util.Scanner;
 
 import javax.swing.JFrame;
 
+
 public class DCPU implements Runnable {
 	public enum Register { A, B, C, X, Y, Z, I, J }
 
