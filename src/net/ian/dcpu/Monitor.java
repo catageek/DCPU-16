@@ -53,7 +53,7 @@ public class Monitor extends Hardware implements MemoryListener {
 	private DCPU cpu;
 	private char memStart, fontStart, paletteStart;
 
-	public boolean shouldRender;
+	public volatile boolean shouldRender;
 	
 	public static class MonitorCell {
 		char character;
@@ -89,7 +89,7 @@ public class Monitor extends Hardware implements MemoryListener {
 	public BufferedImage[] loadDefaultFont() {
 		BufferedImage img;
 		try {
-		img = ImageIO.read(DCPU.class.getResource("/net/ian/dcpu/res/font.png"));
+		img = ImageIO.read(DCPU.class.getResource("/net/ian/DCPU-16/resources/font.png"));
 		} catch (IOException e){
 			e.printStackTrace();
 			return null;
@@ -253,7 +253,7 @@ public class Monitor extends Hardware implements MemoryListener {
 	@Override
 	public void onGet(char location, char value) {}
 	
-	public synchronized boolean getShouldRender() {
+	public boolean getShouldRender() {
 		return shouldRender;
 	}
 	
