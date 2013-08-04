@@ -16,7 +16,7 @@ public final class DCPUCraft extends JavaPlugin {
 	Keyboard keyboard;
 	Monitor monitor;
 	Clock clock;
-	MonitorPanel display;
+	MonitorMapRenderer display;
 	
 	Assembler assembler;
 	String programBuffer;
@@ -29,11 +29,13 @@ public final class DCPUCraft extends JavaPlugin {
 
 		cpu = new DCPU();
 		keyboard = new Keyboard(cpu);
-//		monitor = new Monitor(cpu);
+		monitor = new Monitor(cpu);
 		clock = new Clock(cpu);
 		
 		assembler = new Assembler();
-		
+
+		getServer().getPluginManager().registerEvents(new DCPUListener(), this);
+
        	getCommand("dcpurun").setExecutor(new DCPUCommandExecutor());
        	getCommand("dcpustop").setExecutor(new DCPUCommandExecutor());
        	getCommand("dcpuload").setExecutor(new DCPUCommandExecutor());

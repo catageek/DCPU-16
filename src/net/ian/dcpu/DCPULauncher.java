@@ -19,7 +19,7 @@ public class DCPULauncher extends JPanel implements ActionListener, Runnable {
 	Keyboard keyboard;
 	Monitor monitor;
 	Clock clock;
-	MonitorPanel display;
+	MonitorMapRenderer display;
 	
 	Assembler assembler;
 	
@@ -55,9 +55,9 @@ public class DCPULauncher extends JPanel implements ActionListener, Runnable {
         JScrollPane codeScroll = new JScrollPane(codeEntry);
         frame.add(codeScroll);
        
-        display = new MonitorPanel(monitor);
-        display.addKeyListener(keyboard);
-        output.add(display, BorderLayout.NORTH);
+        display = new MonitorMapRenderer(monitor);
+//        display.addKeyListener(keyboard);
+//        output.add(display, BorderLayout.NORTH);
         
         JPanel buttonBox = new JPanel(new GridLayout(1, 0));
         
@@ -154,7 +154,7 @@ public class DCPULauncher extends JPanel implements ActionListener, Runnable {
 				cpu.running = true;
 			}
 			cpu.cycle();
-			display.tick();
+//			display.tick();
 			tick();
 		} else if (command.equals("stop"))
 			cpu.running = false;
@@ -171,10 +171,10 @@ public class DCPULauncher extends JPanel implements ActionListener, Runnable {
 	public void run() {
 		started = true;
 		while (cpu.running) {
-			display.tick();
+//			display.tick();
 			tick();
 		}
-		display.tick();
+//		display.tick();
 		tick();
 	}
 

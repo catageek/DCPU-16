@@ -3,9 +3,6 @@ package net.ian.dcpu;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Scanner;
-
-import javax.swing.JFrame;
 
 
 public class DCPU implements Runnable {
@@ -33,7 +30,7 @@ public class DCPU implements Runnable {
 	
 	// Special stuff for the emulator being run w/o GUI, from the command line.
 	public boolean commandLine, setPanel;
-	public MonitorPanel panel;
+	public MonitorMapRenderer panel;
 	
 	public DCPU() {
 		this(new char[0]);
@@ -386,8 +383,6 @@ public class DCPU implements Runnable {
 			Hardware device = devices.get(a);
 			// If running w/o GUI, a window is not created until a hardware interrupt is actually
 			// sent to the monitor or keyboard. Maybe add a public bool Hardware.requiresWindow?
-			if (commandLine && (device instanceof Monitor || device instanceof Keyboard))
-				setupPanel();
 			devices.get(a).interrupt();
 			break;
 		default:
@@ -476,29 +471,6 @@ public class DCPU implements Runnable {
 		instructionCount++;
 	}
 	
-	public void setupPanel() {
-		if (setPanel) return;
-		setPanel = true;
-		
-		new Thread() {
-			public void run() {
-		        JFrame frame = new JFrame("DCPU-16");
-		        
-		        frame.setContentPane(panel);
-		        
-		        frame.pack();
-		        frame.setResizable(false);
-		        frame.setLocationRelativeTo(null);
-		        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		        frame.setVisible(true);
-		        
-		        while (running) {
-		        	panel.tick();
-		        }
-			}
-		}.start();
-	}
-	
 	public void run() {
 		running = true;
 		int fps = 60;
@@ -531,23 +503,5 @@ public class DCPU implements Runnable {
 		for (Register r : Register.values())
 			s += r.toString() + ": " + Integer.toHexString(getRegister(r).value) + "\n";
 		return s;
-	}
-	
-	public static void main(String args[]) {
-		Scanner s = new Scanner(System.in);
-		List<Character> code = new ArrayList<>();
-		while (s.hasNextInt(16))
-			code.add((char)s.nextInt(16));
-		
-		DCPU cpu = new DCPU(code);
-		Monitor monitor = new Monitor(cpu);
-		Keyboard keyboard = new Keyboard(cpu);
-		Clock clock = new Clock(cpu);
-		
-		cpu.panel = new MonitorPanel(monitor);
-		cpu.panel.addKeyListener(keyboard);
-		cpu.commandLine = true;
-		cpu.run();
-		System.out.print(cpu.dump());
 	}
 }
