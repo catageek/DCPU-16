@@ -7,9 +7,6 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Scanner;
-
-import net.ian.dcpu.DCPU.Register;
 
 
 public class Assembler {
@@ -376,12 +373,5 @@ public class Assembler {
 	
 	public static char compile(int op, int arg) {
 		return compile(op, arg, -1);
-	}
-	
-	public static void main(String args[]) {
-		String input = new Scanner(System.in).useDelimiter("\\A").next();
-		Assembler as = new Assembler();
-		for (int word : as.assemble(input))
-			System.out.printf("%04x\n", word);
 	}
 }

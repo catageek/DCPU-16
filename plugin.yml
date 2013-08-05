@@ -14,4 +14,7 @@ commands:
     dcpuload:
         description: load the program
         usage: "Usage : /<command>"
-        
+
+    dcpumonitor:
+        description: create a monitor
+        usage: "Usage : /<command>"        

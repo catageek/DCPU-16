@@ -4,15 +4,13 @@ import java.util.logging.Logger;
 
 
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitTask;
 
 public final class DCPUCraft extends JavaPlugin {
 	public static Logger log = Logger.getLogger("Minecraft");
 	public static DCPUCraft myPlugin;
 	public static String logPrefix = "DCPUCraft.";
 	
-	DCPU cpu;
-	BukkitTask dcpuTaskId;
+	final DCPU cpu = new DCPU();
 	Keyboard keyboard;
 	Monitor monitor;
 	Clock clock;
@@ -27,19 +25,16 @@ public final class DCPUCraft extends JavaPlugin {
 
 		myPlugin = this;
 
-		cpu = new DCPU();
 		keyboard = new Keyboard(cpu);
 		monitor = new Monitor(cpu);
 		clock = new Clock(cpu);
 		
 		assembler = new Assembler();
 
-		getServer().getPluginManager().registerEvents(new DCPUListener(), this);
-
        	getCommand("dcpurun").setExecutor(new DCPUCommandExecutor());
        	getCommand("dcpustop").setExecutor(new DCPUCommandExecutor());
        	getCommand("dcpuload").setExecutor(new DCPUCommandExecutor());
-
+       	getCommand("dcpumonitor").setExecutor(new DCPUCommandExecutor());
 
 //		this.saveDefaultConfig();
 }

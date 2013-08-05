@@ -8,9 +8,14 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.map.MapRenderer;
+import org.bukkit.map.MapView;
 
 
 final class DCPUCommandExecutor implements CommandExecutor{
@@ -20,20 +25,20 @@ final class DCPUCommandExecutor implements CommandExecutor{
 			String[] args) {
 		if (cmd.getName().equalsIgnoreCase("dcpurun")) {
 			DCPU cpu = DCPUCraft.myPlugin.cpu;
-			cpu.running = false;
 
 			if (DCPUCraft.myPlugin.programBuffer == null) {
 				sender.sendMessage("You must load a program first");
 				return true;
 			}
+			
+			cpu.stop();
+			cpu.start();
 
-			cpu.clear(DCPUCraft.myPlugin.assembler.assemble(DCPUCraft.myPlugin.programBuffer));
-			DCPUCraft.myPlugin.dcpuTaskId = Bukkit.getScheduler().runTaskAsynchronously(DCPUCraft.myPlugin, cpu);
 			return true;
 		}
 
 		if (cmd.getName().equalsIgnoreCase("dcpustop")) {
-			DCPUCraft.myPlugin.cpu.running = false;
+			DCPUCraft.myPlugin.cpu.stop();
 			return true;
 		}
 
@@ -71,6 +76,30 @@ final class DCPUCommandExecutor implements CommandExecutor{
 
 			return true;
 		}
+
+		if (cmd.getName().equalsIgnoreCase("dcpumonitor")) {
+			if (!(sender instanceof Player)) {
+				sender.sendMessage("This command can only be run by a player.");
+			} else {
+				Player player = (Player) sender;
+				ItemStack item;
+				if (! (item = player.getItemInHand()).getType().equals(Material.MAP))
+					player.sendMessage("You must hold a map in hand before typing this command.");
+				else {
+					MapView map = Bukkit.getServer().getMap(item.getDurability());
+					for (MapRenderer r : map.getRenderers())
+					{
+						map.removeRenderer(r);
+					}
+
+					map.addRenderer(new MonitorMapRenderer(DCPUCraft.myPlugin.monitor));
+					player.sendMap(map);
+				}
+			}
+			return true;
+
+		}
+
 
 		return false;
 	}
