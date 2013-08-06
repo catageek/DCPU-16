@@ -497,6 +497,7 @@ public class DCPU extends BukkitRunnable {
 	}
 	
 	public synchronized void start() {
+		DCPUCraft.myPlugin.monitor.reset();
 		clear(DCPUCraft.myPlugin.assembler.assemble(DCPUCraft.myPlugin.programBuffer));
 		taskId = Bukkit.getScheduler().runTaskAsynchronously(DCPUCraft.myPlugin, this).getTaskId();
 	}

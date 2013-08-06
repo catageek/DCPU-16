@@ -79,12 +79,17 @@ public class Monitor extends Hardware implements MemoryListener {
         for (int i = 0; i < 32 * 12; i++)
         	cells[i] = new MonitorCell((char)0, Color.BLACK, Color.BLACK, false);
         
-		font = loadDefaultFont();
-		palette = Arrays.copyOf(defaultPalette, defaultPalette.length);
+        // initialize font and palette to default
+		reset();
                 
         cpu.attachDevice(this);
         cpu.addListener(this);
     }
+
+	void reset() {
+		font = loadDefaultFont();
+		palette = Arrays.copyOf(defaultPalette, defaultPalette.length);
+	}
 	
 	public BufferedImage[] loadDefaultFont() {
 		BufferedImage img;
@@ -280,7 +285,7 @@ public class Monitor extends Hardware implements MemoryListener {
 		case 1: // MEM_MAP_FONT
 			fontStart = b;
 			if (b == 0)
-		        font = loadDefaultFont();
+				font = loadDefaultFont();
 			else {
 				for (int i = 0; i < 0x100 && fontStart + i < 0x10000; i++)
 					buildFont(i, cpu.memory[fontStart + i].value);
