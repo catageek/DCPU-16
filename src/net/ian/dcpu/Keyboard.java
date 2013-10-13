@@ -1,13 +1,11 @@
 package net.ian.dcpu;
 
-import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
 import java.util.HashMap;
 import java.util.Map;
 
 import net.ian.dcpu.DCPU.Register;
 
-public class Keyboard extends Hardware implements KeyListener {
+public class Keyboard extends Hardware {
 	public static final int ID = 0x30cf7406;
 	public static final int VERSION = 1;
 	public static final int MANUFACTURER = 0xCC_743_CA7;
@@ -16,10 +14,8 @@ public class Keyboard extends Hardware implements KeyListener {
 	private char[] keyring = new char[64];
 	private int keyPushPtr = 0;
 	private int keyAccessPtr = 0;
-	// Max key value seems to be 145.
-	private boolean[] keyStates = new boolean[146];
 	private char interruptMsg;
-	private boolean shouldInterrupt;
+	boolean shouldInterrupt;
 	
 	DCPU cpu;
 	
@@ -40,45 +36,15 @@ public class Keyboard extends Hardware implements KeyListener {
         super(ID, VERSION, MANUFACTURER);
 		
 		this.cpu = cpu;
-		cpu.attachDevice(this);		
 	}
 	
 	public int mapKey(int key) {
 		return keyMap.containsKey(key) ? keyMap.get(key) : -1;
 	}
 	
-	private void addKey(char key) {
+	void addKey(char key) {
 		keyring[keyPushPtr++] = key;
 		keyPushPtr &= 64;
-	}
-	
-	@Override
-	public void keyPressed(KeyEvent e) {
-		int key = mapKey(e.getKeyCode());
-		if (key == -1) return;
-		if (key < 20)
-			addKey((char)key);
-		shouldInterrupt = true;
-		keyStates[key] = true;
-		System.err.printf("Key press: %d (dcpu: %d)\n", e.getKeyCode(), key);
-	}
-
-	@Override
-	public void keyReleased(KeyEvent e) {
-		int key = mapKey(e.getKeyCode());
-		if (key == -1) return;
-		shouldInterrupt = true;
-		keyStates[key] = false;
-		System.err.printf("Key release: %d (dcpu: %d)\n", e.getKeyCode(), key);
-	}
-	
-	@Override
-	public void keyTyped(KeyEvent e) {
-		if (e.getKeyChar() >= 0x20 && e.getKeyChar() <= 0x7f) {
-			addKey(e.getKeyChar());
-			shouldInterrupt = true;
-			System.err.printf("Key typed: %d = %c\n", (int)e.getKeyChar(), e.getKeyChar());
-		}
 	}
 	
 	public void tick() {
@@ -104,8 +70,8 @@ public class Keyboard extends Hardware implements KeyListener {
 				keyAccessPtr &= 64;
 			}
 			break;
-		case 2: // Set C to 1 if key specified by B is pressed, 0 otherwise.
-			c = b < keyStates.length && keyStates[b] ? 1 : 0;
+		case 2: // Not implemented, Set C to 0.
+			c = 0;
 			break;
 		case 3: // If B is 0, disable interrupts. Otherwise enable them with message B.
 			interruptMsg = b;

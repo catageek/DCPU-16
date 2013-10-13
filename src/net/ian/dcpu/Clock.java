@@ -16,7 +16,6 @@ public class Clock extends Hardware {
 	public Clock(DCPU cpu) {
 		super(ID, VERSION, MANUFACTURER);
 		this.cpu = cpu;
-		cpu.attachDevice(this);
 	}
 	
 	public void tick() {

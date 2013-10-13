@@ -9,6 +9,9 @@ import org.bukkit.map.MapCanvas;
 import org.bukkit.map.MapRenderer;
 import org.bukkit.map.MapView;
 
+/**
+ * This renderer displays the DCPU screen on a map
+ */
 public class MonitorMapRenderer extends MapRenderer {
 
 	public static final int SCALE = 1;

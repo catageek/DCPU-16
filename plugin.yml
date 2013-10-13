@@ -17,4 +17,7 @@ commands:
 
     dcpumonitor:
         description: create a monitor
-        usage: "Usage : /<command>"        
+        usage: "Usage : /<command>"  
+    dcpu:
+        description: create a DCPU with a name
+        usage: "Usage : /<command> name"      

@@ -1,57 +1,71 @@
 package net.ian.dcpu;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.WeakHashMap;
+
+import javax.annotation.concurrent.GuardedBy;
 
 import org.bukkit.Bukkit;
+import org.bukkit.map.MapRenderer;
+import org.bukkit.map.MapView;
 import org.bukkit.scheduler.BukkitRunnable;
 
 
-public class DCPU extends BukkitRunnable {
+public final class DCPU extends BukkitRunnable {
 	public enum Register { A, B, C, X, Y, Z, I, J }
 
-	public Cell[] register;
-	public MemoryCell[] memory;
-	public Cell SP, PC, EX, IA;
+	private final Cell[] register;
+	final MemoryCell[] memory;
+	private final Cell SP, PC, EX, IA;
 	// If true, interrupts are queued. If false, they are triggered.
-	boolean iaq = false;
-	char interrupts[] = new char[256];
-	char intCurPtr, intEndPtr;
+	private boolean iaq = false;
+	private final char interrupts[] = new char[256];
+	private char intCurPtr, intEndPtr;
 
-	public List<Hardware> devices = new ArrayList<>();
-	public List<MemoryListener> listeners = new ArrayList<>();
+	private final List<Hardware> devices = new ArrayList<>();
+	final List<MemoryListener> listeners = new ArrayList<>();
 
-	static final int fps = 20;
-	static final int hz = 100_000;
-	static final int cyclesPerFrame = hz / fps;
-	static final int nsPerFrame = 1000_000_000 / fps;
+	static private final int fps = 20;
+	static private final int hz = 100_000;
+	static private final int cyclesPerFrame = hz / fps;
 
-	private boolean running = true;
 	private boolean skipping = false;
+	private boolean running = true;
 
-	public int instructionCount, cycles;
+	private Monitor monitor;
+	private Keyboard keyboard;
+
+	// list of maps registered as monitors
+	private final Map<MapView, List<MapRenderer>> maps = new WeakHashMap<MapView, List<MapRenderer>>();
+
+	final Monitor getMonitor() {
+		return monitor;
+	}
+
+	final Keyboard getKeyboard() {
+		return keyboard;
+	}
+
+	int cycles;
 
 	public static final boolean debug = false;
 
-	public Map<Integer, String> labels;
-
-	// Special stuff for the emulator being run w/o GUI, from the command line.
-	public boolean commandLine, setPanel;
-	public MonitorMapRenderer panel;
+	@GuardedBy("this")
 	private int taskId = -1;
 
-	public DCPU() {
-		this(new char[0]);
-	}
+	private final String name;
 
-	public DCPU(char[] mem) {
+	DCPU(String name) {
+		this.name = name;
 		register = new Cell[Register.values().length];
 		for (int i = 0; i < Register.values().length; i++)
 			register[i] = new Cell(0);
 		memory = new MemoryCell[0x10000]; // 0x10000 words in size
 		for (int i = 0; i < 0x10000; i++)
-			memory[i] = new MemoryCell(this, (char)i, i < mem.length ? mem[i] : 0);
+			memory[i] = new MemoryCell(this, (char)i, (char) 0);
 
 		SP = new Cell(0);
 		PC = new Cell(0);
@@ -59,12 +73,17 @@ public class DCPU extends BukkitRunnable {
 		IA = new Cell(0);
 	}
 
-	public DCPU(List<Character> mem) {
-		this(unboxArray(mem));
+	void addDevices() {
+		keyboard = new Keyboard(this);
+		attachDevice(keyboard);
+		monitor = new Monitor(this);
+		attachDevice(monitor);
+		addListener(monitor);
+		attachDevice(new Clock(this));
 	}
 
 	// Code duplication... :/
-	public void clear(char[] mem) {
+	private void clear(char[] mem) {
 		for (int i = 0; i < Register.values().length; i++)
 			register[i].value = 0;
 
@@ -80,18 +99,10 @@ public class DCPU extends BukkitRunnable {
 			PC.value = 0;
 			EX.value = 0;
 			IA.value = 0;
-
-			instructionCount = 0;
 	}
 
 	public void clear(List<Character> mem) {
 		clear(unboxArray(mem));
-	}
-
-	public void setMemory(List<Character> listMem) {
-		char[] mem = unboxArray(listMem);
-		for (int i = 0; i < mem.length; i++)
-			memory[i].value = mem[i];
 	}
 
 	// Bleh.
@@ -118,18 +129,18 @@ public class DCPU extends BukkitRunnable {
 			System.err.printf(s, o);
 	}
 
-	public void attachDevice(Hardware h) {
+	private void attachDevice(Hardware h) {
 		devices.add(h);
 	}
-	public void addListener(MemoryListener l) {
+	private void addListener(MemoryListener l) {
 		listeners.add(l);
 	}
 
-	public Cell getRegister(Register r) {
+	final Cell getRegister(Register r) {
 		return register[r.ordinal()];
 	}
 
-	public void interrupt(char interruptMsg) {
+	final void interrupt(char interruptMsg) {
 		interrupts[intEndPtr++] = interruptMsg;		
 		intEndPtr &= 255;
 		// TODO: Make it catch fire if intEndPtr == intProcessPtr, which
@@ -184,7 +195,7 @@ public class DCPU extends BukkitRunnable {
 		return new Cell(code - 0x21);
 	}
 
-	public void skipIf(boolean test) {
+	private void skipIf(boolean test) {
 		// All IF instructions take at least 2 cycles.
 		cycles += 2;
 		// And an extra cycle if the test fails.
@@ -222,107 +233,107 @@ public class DCPU extends BukkitRunnable {
 			cycles += 2;
 			b = (short)a * (short)b;
 			ex = b >> 16 & 0xffff;
-		break;
-		case 0x6: // DIV divides b by a
-			cycles += 3;
-			if (a == 0) {
-				b = 0;
-				ex = 0;
-			} else {
-				ex = (b << 16) / a;
-				b /= a;
-			}
 			break;
-		case 0x7: // DVI - divides signed values
-			cycles += 3;
-			if (a == 0) {
-				b = 0;
-				ex = 0;
-			} else {
-				ex = ((short)b << 16) / (short)a;
-				b = (short)b / (short)a;
-			}
-			break;
-		case 0x8: // MOD - (sets b to b % a)
-			cycles += 3;
-			b = (a == 0) ? 0 : b % a;
-			break;
-		case 0x9: // MDI - MOD with signed values
-			cycles += 3;
-			b = (a == 0) ? 0 : (short)b % (short)a;
-		case 0xa: // AND - sets b to b & a
-			cycles++;
-			b &= a;
-			break;
-		case 0xb: // BOR - sets b to b | a
-			cycles++;
-			b |= a;
-			break;
-		case 0xc: // XOR - sets b to b ^ a
-			cycles++;
-			b ^= a;
-			break;
-		case 0xd: // SHR - shifts b right by a (logical shift)
-			cycles++;
-			ex = b << 16 >> a;
-			b >>>= a;
+			case 0x6: // DIV divides b by a
+				cycles += 3;
+				if (a == 0) {
+					b = 0;
+					ex = 0;
+				} else {
+					ex = (b << 16) / a;
+					b /= a;
+				}
 				break;
-				case 0xe: // ASR - shift b right by a (arithmetic shift)
-					cycles++;
-					ex = b << 16 >>> a;
-					b >>= a;
+			case 0x7: // DVI - divides signed values
+				cycles += 3;
+				if (a == 0) {
+					b = 0;
+					ex = 0;
+				} else {
+					ex = ((short)b << 16) / (short)a;
+					b = (short)b / (short)a;
+				}
+				break;
+			case 0x8: // MOD - (sets b to b % a)
+				cycles += 3;
+				b = (a == 0) ? 0 : b % a;
+				break;
+			case 0x9: // MDI - MOD with signed values
+				cycles += 3;
+				b = (a == 0) ? 0 : (short)b % (short)a;
+			case 0xa: // AND - sets b to b & a
+				cycles++;
+				b &= a;
+				break;
+			case 0xb: // BOR - sets b to b | a
+				cycles++;
+				b |= a;
+				break;
+			case 0xc: // XOR - sets b to b ^ a
+				cycles++;
+				b ^= a;
+				break;
+			case 0xd: // SHR - shifts b right by a (logical shift)
+				cycles++;
+				ex = b << 16 >> a;
+				b >>>= a;
+					break;
+					case 0xe: // ASR - shift b right by a (arithmetic shift)
+						cycles++;
+						ex = b << 16 >>> a;
+						b >>= a;
 		break;
-	case 0xf: // SHL - shifts b left by a
-		cycles++;
-		ex = b << a >> 16;
-		b = b << a;
-		break;
-	case 0x10: // IFB - performs next instruction if (b & a) != 0
-		skipIf((b & a) == 0);
-		break;
-	case 0x11: // IFC - performs next instruction if (b & a) == 0
-		skipIf((b & a) != 0);
-		break;
-	case 0x12: // IFE - performs next instruction if b == a
-		skipIf(b != a);
-		break;
-	case 0x13: // IFN - performs next instruction if b != a
-		skipIf(b == a);
-		break;
-	case 0x14: // IFG - performs next instruction if b > a
-		skipIf(b <= a);
-		break;
-	case 0x15: // IFA - IFG with signed values
-		skipIf((short)b <= (short)a);
-		break;
-	case 0x16: // IFL - performs next instruction if b < a
-		skipIf(b >= a);
-		break;
-	case 0x17: // IFU - IFL with signed values
-		skipIf((short)b >= (short)a); 
-		break;
-	case 0x1a: // ADX - sets b to b+a+EX
-		cycles += 3;
-		ex = (b += a + ex) > 0xffff ? 1 : 0;
-		break;
-	case 0x1b: // SBX - sets b to b-a+EX
-		cycles += 3;
-		ex = (b = b - a + ex) < 0 ? 0xffff : 0;
-		break;
-	case 0x1e: // STI - sets b to a, then increments I and J
-		cycles += 2;
-		b = a;
-		getRegister(Register.I).value++;
-		getRegister(Register.J).value++;
-		break;
-	case 0x1f: // STD - sets b to a, then decrements I and J
-		cycles += 2;
-		b = a;
-		getRegister(Register.I).value--;
-		getRegister(Register.J).value--;
-		break;	
-	default:
-		debugln("Error: Unimplemented basic instruction: 0x" + Integer.toHexString(opcode));
+		case 0xf: // SHL - shifts b left by a
+			cycles++;
+			ex = b << a >> 16;
+			b = b << a;
+			break;
+		case 0x10: // IFB - performs next instruction if (b & a) != 0
+			skipIf((b & a) == 0);
+			break;
+		case 0x11: // IFC - performs next instruction if (b & a) == 0
+			skipIf((b & a) != 0);
+			break;
+		case 0x12: // IFE - performs next instruction if b == a
+			skipIf(b != a);
+			break;
+		case 0x13: // IFN - performs next instruction if b != a
+			skipIf(b == a);
+			break;
+		case 0x14: // IFG - performs next instruction if b > a
+			skipIf(b <= a);
+			break;
+		case 0x15: // IFA - IFG with signed values
+			skipIf((short)b <= (short)a);
+			break;
+		case 0x16: // IFL - performs next instruction if b < a
+			skipIf(b >= a);
+			break;
+		case 0x17: // IFU - IFL with signed values
+			skipIf((short)b >= (short)a); 
+			break;
+		case 0x1a: // ADX - sets b to b+a+EX
+			cycles += 3;
+			ex = (b += a + ex) > 0xffff ? 1 : 0;
+			break;
+		case 0x1b: // SBX - sets b to b-a+EX
+			cycles += 3;
+			ex = (b = b - a + ex) < 0 ? 0xffff : 0;
+			break;
+		case 0x1e: // STI - sets b to a, then increments I and J
+			cycles += 2;
+			b = a;
+			getRegister(Register.I).value++;
+			getRegister(Register.J).value++;
+			break;
+		case 0x1f: // STD - sets b to a, then decrements I and J
+			cycles += 2;
+			b = a;
+			getRegister(Register.I).value--;
+			getRegister(Register.J).value--;
+			break;	
+		default:
+			debugln("Error: Unimplemented basic instruction: 0x" + Integer.toHexString(opcode));
 		}
 		cellA.set(a);
 		cellB.set(b);
@@ -388,10 +399,12 @@ public class DCPU extends BukkitRunnable {
 			break;
 		case 0x12: // HWI - send an interrupt to hardware a
 			cycles += 4;
+			debugln("receiving HWI for device " + a);
 			if (a >= devices.size()) return;
-//			Hardware device = devices.get(a);
+			//			Hardware device = devices.get(a);
 			// If running w/o GUI, a window is not created until a hardware interrupt is actually
 			// sent to the monitor or keyboard. Maybe add a public bool Hardware.requiresWindow?
+			debugln("Sending interrupt to " + a);
 			devices.get(a).interrupt();
 			break;
 		default:
@@ -401,20 +414,15 @@ public class DCPU extends BukkitRunnable {
 		cellA.set(a);
 	}
 
-	@SuppressWarnings("unused")
-	public void cycle() {
-		if (debug && labels != null && labels.containsKey(PC.value)) {
-			System.err.println(labels.get(PC.value));
-		}
-
+	private final void cycle() {
 		int instruction = memory[PC.value].value;
 		int opcode = 0;
 		int rawA = 0, rawB = -1;
 		if ((instruction & 0b11111) == 0) {
 			// Non-basic opcode. aaaaaaooooo00000
 			instruction >>= 5;
-		opcode = skipping ? 0 : instruction & 0b11111;
-		rawA = instruction >> 5 & 0b111111;
+			opcode = skipping ? 0 : instruction & 0b11111;
+			rawA = instruction >> 5 & 0b111111;
 		} else {
 			// Basic opcode. aaaaaabbbbbooooo
 			opcode = instruction & 0b11111;
@@ -476,43 +484,66 @@ public class DCPU extends BukkitRunnable {
 			processBasic(opcode, a, b);
 		else
 			processSpecial(opcode, a);
-
-		instructionCount++;
 	}
 
-	public synchronized void run() {
-		if (! running) {
-			running = true;
-			return;
-		}
-
-		while (cycles < cyclesPerFrame)
+	public final synchronized void run() {
+		while (cycles < cyclesPerFrame && running)
 			cycle();
 		cycles -= cyclesPerFrame;
 
 		for (Hardware device : devices)
 			device.tick();
-		
-		taskId = Bukkit.getScheduler().runTaskAsynchronously(DCPUCraft.myPlugin, this).getTaskId();
+		if (running)
+			taskId = Bukkit.getScheduler().runTaskAsynchronously(DCPUCraft.myPlugin, this).getTaskId();
+		else
+			running = true;
 	}
-	
-	public synchronized void start() {
-		DCPUCraft.myPlugin.monitor.reset();
+
+	final synchronized void start() {
+		monitor.reset();
 		clear(DCPUCraft.myPlugin.assembler.assemble(DCPUCraft.myPlugin.programBuffer));
 		taskId = Bukkit.getScheduler().runTaskAsynchronously(DCPUCraft.myPlugin, this).getTaskId();
 	}
 
-	public synchronized void stop() {
+	final synchronized void stop() {
 		if (taskId != -1) {
 			Bukkit.getScheduler().cancelTask(taskId);
 			taskId = -1;
 		}
+
 	}
 
-	public String dump() {
-		String s = "";
-		for (Register r : Register.values())
-			s += r.toString() + ": " + Integer.toHexString(getRegister(r).value) + "\n";
-		return s;
+	final void restoreRenderers() {
+		Iterator<MapView> it = maps.keySet().iterator();
+		while (it.hasNext()) {
+			MapView map = it.next();
+			for (MapRenderer r : map.getRenderers()) {
+				map.removeRenderer(r);
+			}
+
+			for (MapRenderer m : maps.get(map)) {
+				map.addRenderer(m);
+			}
+			maps.remove(map);
+		}
+	}
+
+	final void removeMap(MapView map) {
+		maps.remove(map);
+	}
+
+	final boolean isMonitor(MapView map) {
+		return maps.containsKey(map);
+	}
+
+	final void addMonitorRenderer(MapView map, List<MapRenderer> oldrenderers) {
+		maps.put(map, oldrenderers);
+	}
+
+	/**
+	 * @return the name
+	 */
+	String getName() {
+		return name;
 	}
 }

@@ -8,15 +8,16 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.map.MapRenderer;
 import org.bukkit.map.MapView;
-
 
 final class DCPUCommandExecutor implements CommandExecutor{
 
@@ -92,12 +93,62 @@ final class DCPUCommandExecutor implements CommandExecutor{
 						map.removeRenderer(r);
 					}
 
-					map.addRenderer(new MonitorMapRenderer(DCPUCraft.myPlugin.monitor));
+//					map.addRenderer(new MonitorMapRenderer(DCPUCraft.myPlugin.monitor));
 					player.sendMap(map);
 				}
 			}
 			return true;
 
+		}
+
+		if (cmd.getName().equalsIgnoreCase("dcpu")) {
+			if (!(sender instanceof Player)) {
+				sender.sendMessage("This command can only be run by a player.");
+			} else {
+				Player player = (Player) sender;
+
+				if(args.length != 1)
+					return false;
+
+				String name = args[0];
+				
+				final class Execute implements ModifiableRunnable<Inventory> {
+
+					private final Player player;
+					private final String name;
+					private String location;
+
+					public Execute(Player player, String name) {
+						this.player = player;
+						this.name = name;
+					}
+
+					public void run() {
+						if (DCPUCraft.myPlugin.addDCPU(location, name)) {
+							LogUtil.sendSuccess(player, "DCPU created");
+						}
+						else
+							LogUtil.sendError(player, "This chest is already a DCPU, or there is a DCPU with this name");
+					}
+
+
+					/**
+					 * @param inventory
+					 * @param inventory the inventory to set
+					 */
+
+					@Override
+					public void SetParam(String location) {
+						this.location = location;
+					}
+
+				}
+
+
+				player.sendMessage(ChatColor.DARK_GREEN+"[DCPUCraft] " + ChatColor.YELLOW + "Please right-click on a chest" );
+				new DCPUInventoryListener(DCPUCraft.myPlugin, player, new Execute(player, name));
+			}
+			return true;
 		}
 
 
