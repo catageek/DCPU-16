@@ -16,38 +16,38 @@ public class Assembler {
 		"MDI", "AND", "BOR", "XOR", "SHR", "ASR", "SHL", "IFB",
 		"IFC", "IFE", "IFN", "IFG", "IFA", "IFL", "IFU", "   ",
 		"   ", "ADX", "SBX", "   ", "   ", "STI", "STD"
-		};
+	};
 
 	public static final String[] specialOps = {
 		"JSR", "   ", "   ", "   ", "   ", "   ", "HCF", "INT",
 		"IAG", "IAS", "RFI", "IAQ", "   ", "   ", "   ", "HWN",
 		"HWQ", "HWI", "   ", "   ", "   ", "   ", "   ", "   ",
 		"   ", "   ", "   ", "   ", "   ", "   ", "   "
-		};
+	};
 	public static final String[] registers;
 	public static final String[] special = { "SP", "PC", "EX" };
 
 	public ArrayList<Character> instructions;
-	
+
 	public Map<String, Integer> labels;
 	public Map<Integer, String> fixes;
-		
+
 	static {
 		DCPU.Register regs[] = DCPU.Register.values();
 		registers = new String[regs.length];
 		for (DCPU.Register r : regs)
 			registers[r.ordinal()] = r.toString();
 	}
-	
+
 	private static class Argument {
 		public List<Character> code;
 		public String label = null;
-		
+
 		@SuppressWarnings("unused")
 		public Argument(Character... args) {
 			code = Arrays.asList(args);
 		}
-		
+
 		// I immensely dislike how Java makes a big
 		// distinction between integer data types.
 		public Argument(int... args) {
@@ -55,24 +55,24 @@ public class Assembler {
 			for (int i : args)
 				code.add((char)i);
 		}
-		
+
 		@SuppressWarnings("unused")
 		public Argument(String label, Character... args) {
 			code = Arrays.asList(args);
 			this.label = label;
 		}
-		
+
 		public Argument(String label, int... args) {
 			this(args);
 			this.label = label;
 		}
 	}
-	
+
 	public List<Character> assemble(String code) {
 		instructions = new ArrayList<Character>();
 		labels = new HashMap<String, Integer>();
 		fixes = new HashMap<Integer, String>();
-		
+
 		String[] lines = code.trim().split("\\s*\n\\s*");
 		for (String line : lines) {
 			// Comments
@@ -80,10 +80,10 @@ public class Assembler {
 
 			if (c.length == 0)
 				continue;
-			line = c[0];
+			line = c[0].trim();
 			if (line.isEmpty())
 				continue;
-			
+
 			// Labels
 			if (line.startsWith(":")) {
 				String[] tmp = line.split("\\s+", 2);
@@ -98,7 +98,7 @@ public class Assembler {
 				if (line.isEmpty())
 					continue;
 			}
-			
+
 			// Split instruction and args
 			String[] tokens = line.split("\\s+", 2);
 
@@ -109,7 +109,7 @@ public class Assembler {
 				instructions.addAll(parseDat(line));
 				continue;
 			}
-			
+
 			String op = tokens[0];
 
 			// Split args separated by comma
@@ -130,15 +130,15 @@ public class Assembler {
 			else
 				instructions.addAll(assembled);
 		}
-		
+
 		insertLabels();
-		
+
 		return instructions;
 	}
-	
+
 	private List<Character> parseDat(String line) {
 		List<Character> data = new ArrayList<>();
-		
+
 		line = line.trim();
 		line = line.substring(3); // Length of "DAT"
 		line = line.trim();
@@ -178,8 +178,19 @@ public class Assembler {
 					line = split[1];
 					continue;
 				}
-				data.add((char)parseInt(num));
-				line = line.substring(num.length());
+				int size = num.length();
+				// it may be a label reference
+				if (labels.containsKey(num.toUpperCase())) {
+					num = labels.get(num.toUpperCase()).toString();
+				}
+				try {
+					data.add((char)parseInt(num));
+				} catch (NumberFormatException e) {
+					// Maybe it is a label not declared yet
+					fixes.put(instructions.size() + data.size(), num.toUpperCase());
+					data.add((char)-1);
+				}
+				line = line.substring(size);
 			}
 			line = line.trim();
 		}
@@ -192,7 +203,7 @@ public class Assembler {
 		for (Map.Entry<Integer, String> entry : fixes.entrySet()) {
 			int index = entry.getKey();
 			String label = entry.getValue();
-			System.err.printf("Fixing: %s at %d\n", label, index);
+//			System.err.printf("Fixing: %s at %d\n", label, index);
 			Integer loc;
 			if ((loc = labels.get(label)) != null) {
 				instructions.set(index, (char)(int)loc);
@@ -200,7 +211,7 @@ public class Assembler {
 				System.err.printf("Error: True assembly error (in insertLabels): %s at %d\n", label, index);
 		}
 	}
-	
+
 	public List<Character> assemble(String sOp, String sArg1, String sArg2) {
 		sOp = sOp.toUpperCase();
 		boolean isBasic = (sArg2 != null);
@@ -209,20 +220,20 @@ public class Assembler {
 			System.err.println("Broken OP! \"" + sOp + "\" isBasic = " + isBasic);
 		int a, b = -1;
 		int instructionCount = instructions.size();
-		
+
 		sArg1 = sArg1.toUpperCase();
 		if (isBasic)
 			sArg2 = sArg2.toUpperCase();
-		
+
 		Argument argA = handleArgument(isBasic ? sArg2 : sArg1);
 		List<Character> codeA = argA.code;
 		instructionCount += codeA.size() - 1;
-		
+
 		if (argA.label != null)
 			fixes.put(instructionCount, argA.label);
-		
+
 		a = codeA.get(0);
-			
+
 		Argument argB = null;
 		List<Character> codeB = null;
 		if (isBasic) {
@@ -233,39 +244,39 @@ public class Assembler {
 				fixes.put(instructionCount, argB.label);
 			b = codeB.get(0);
 		}
-		
+
 		List<Character> words = new ArrayList<>();
 		words.add(compile(op, a, b));
 		words.addAll(codeA.subList(1, codeA.size()));
 		if (argB != null)
 			words.addAll(codeB.subList(1, codeB.size()));
-				
+
 		return words;
 	}
-	
+
 	public List<Character> assemble(String op, String arg) {
 		return assemble(op, arg, null);
 	}
-	 
+
 	private Argument handleArgument(String arg) {
 		int index = Arrays.asList(registers).indexOf(arg);
 		if (index != -1)
 			return new Argument(index);
-		
+
 		if ((index = Arrays.asList(special).indexOf(arg)) != -1)
 			return new Argument(index + 0x1b);
 
 		Argument argument;
 		if ((argument = handleStack(arg)) != null)
 			return argument;
-		
+
 		if (labels.containsKey(arg)) {
 			int loc = labels.get(arg);
 			if (loc < 30)
 				return new Argument(loc + 0x21);
 			return new Argument(0x1f, loc);
 		}
-		
+
 		int n;
 		try {
 			n = parseInt(arg);
@@ -273,7 +284,7 @@ public class Assembler {
 				return new Argument(n + 0x21);
 			return new Argument(0x1f, n);
 		} catch (NumberFormatException _) {}
-		
+
 		if (arg.startsWith("[")) {
 			if (!arg.endsWith("]")) {
 				System.err.println("Error: No closing square bracket in argument: \"" + arg + "\"");
@@ -286,7 +297,7 @@ public class Assembler {
 				n = parseInt(arg);
 				return new Argument(0x1e, n);
 			} catch (NumberFormatException _) {}
-				
+
 			if (labels.containsKey(arg))
 				return new Argument(0x1e, labels.get(arg));
 			if (arg.contains("+")) {
@@ -302,17 +313,17 @@ public class Assembler {
 						return new Argument(other, index + 0x10, -1);
 					}
 				}
-				
+
 			}
-			
+
 			// This didn't match anything. It might be referencing a label (this gets fixed in insertLabels()).
 			return new Argument(arg, 0x1e, -1);
 		}
-		
+
 		// Same here.
 		return new Argument(arg, 0x1f, -1);
 	}
-	
+
 	private static int parseInt(String s) throws NumberFormatException {
 		try {
 			int n = Integer.parseInt(s);
@@ -341,11 +352,11 @@ public class Assembler {
 				// Also not binary.
 			}
 		}
-		
+
 		// I don't care if it's used by Integer.parseInt(), I'm stealing it! Muahahahaha!
 		throw new NumberFormatException("Could not convert string \"" + s + "\" to a decimal, hex, or binary number.");
 	}
-	
+
 	private static Argument handleStack(String s) {
 		if (s.equals("POP") || s.equals("PUSH"))
 			return new Argument(0x18);
@@ -357,18 +368,18 @@ public class Assembler {
 		}
 		return null;
 	}
-	
+
 	// Changes arguments into machine code.
 	public static char compile(int op, int a, int b) {
 		boolean isBasic = (b != -1);
-		
+
 		String sOp = String.format("%05d", Integer.parseInt(Integer.toBinaryString(op)));
 		String sA = String.format("%06d", Integer.parseInt(Integer.toBinaryString(a)));
 		String sB = isBasic ? String.format("%05d", Integer.parseInt(Integer.toBinaryString(b))) : "";
-		
+
 		return (char)Integer.parseInt(sA + sB + sOp + (isBasic ? "" : "00000"), 2);
 	}
-	
+
 	public static char compile(int op, int arg) {
 		return compile(op, arg, -1);
 	}
